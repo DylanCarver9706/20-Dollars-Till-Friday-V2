@@ -120,6 +120,24 @@ const getNextRecurringDate = (lastDate, frequency) => {
   }
 };
 
+const hasMonthlyFinancialSurplus = (recurringCharges) => {
+  const { recurring_credits, recurring_debits } = recurringCharges;
+
+  const totalCredits = recurring_credits.reduce((sum, credit) => {
+    return sum + parseFloat(credit.amount);
+  }, 0);
+
+  const totalDebits = recurring_debits.reduce((sum, debit) => {
+    return sum + parseFloat(debit.amount);
+  }, 0);
+
+  return {
+    totalCredits,
+    totalDebits,
+    isPositive: totalCredits > totalDebits,
+  };
+};
+
 // CRUD Operations for Users
 
 // Get all users
@@ -145,7 +163,7 @@ app.post("/users", (req, res) => {
   const newUser = {
     id: data.length > 0 ? data[data.length - 1].id + 1 : 1,
     ...req.body,
-    recurring_charges: {}
+    recurring_charges: {},
   };
   data.push(newUser);
   writeData(data);
@@ -170,7 +188,13 @@ app.put("/users_recurring_charges/:id", (req, res) => {
   const data = readData();
   const index = data.findIndex((u) => u.id === parseInt(req.params.id));
   if (index !== -1) {
-    data[index] = { ...data[index], recurring_charges: formatRecurringResponseData(req.body) };
+    data[index] = {
+      ...data[index],
+      recurring_charges: formatRecurringResponseData(req.body),
+      monthly_financial_surplus: hasMonthlyFinancialSurplus(
+        formatRecurringResponseData(req.body)
+      ).isPositive,
+    };
     writeData(data);
     res.json(data[index]);
   } else {
