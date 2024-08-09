@@ -18,18 +18,27 @@ const Home = ({ userData }) => {
     setDate(newDate);
   };
 
-  // Load initial charges from userData
+  // Load initial charges from the API
   useEffect(() => {
-    if (userData && userData.charges_to_render) {
-      const newCharges = userData.charges_to_render.map((charge) => {
-        const chargeDate = new Date(charge.charge_date);
-        chargeDate.setDate(chargeDate.getDate() + 1); // Add one day to the charge_date
-        return { ...charge, date: chargeDate };
-      });
-      setCharges(newCharges);
-    }
-    if (userData && userData.disposable_income) {
-      setFinancialPosition(userData.disposable_income);
+    if (userData && userData.id) {
+      fetch(`http://localhost:3000/users/${userData.id}`)
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.charges_to_render) {
+            const newCharges = data.charges_to_render.map((charge) => {
+              const chargeDate = new Date(charge.charge_date);
+              chargeDate.setDate(chargeDate.getDate() + 1); // Add one day to the charge_date
+              return { ...charge, date: chargeDate };
+            });
+            setCharges(newCharges);
+          }
+          if (data.disposable_income) {
+            setFinancialPosition(data.disposable_income);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching user data:", error);
+        });
     }
   }, [userData]);
 
