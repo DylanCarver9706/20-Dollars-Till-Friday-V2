@@ -5,7 +5,7 @@ import "../App.css"; // Import custom styles
 const Home = ({ userData }) => {
   const [charges, setCharges] = useState([]);
   const [date, setDate] = useState(new Date());
-  const [financialPosition, setFinancialPosition] = useState(null);
+  const [disposableIncome, setDisposableIncome] = useState(null);
 
   // Form state
   const [merchantName, setMerchantName] = useState("");
@@ -33,7 +33,7 @@ const Home = ({ userData }) => {
             setCharges(newCharges);
           }
           if (data.disposable_income) {
-            setFinancialPosition(data.disposable_income);
+            setDisposableIncome(data.disposable_income);
           }
         })
         .catch((error) => {
@@ -51,6 +51,10 @@ const Home = ({ userData }) => {
       type: type,
     };
 
+    // Convert string to Date obj and add a day to render correctly
+    let convertedDate = new Date(chargeDate)
+    convertedDate.setDate(convertedDate.getDate() + 1)
+  
     // Send the POST request
     fetch(`http://localhost:3000/users/${userData.id}/recurring_charges`, {
       method: "POST",
@@ -62,9 +66,11 @@ const Home = ({ userData }) => {
       .then((response) => response.json())
       .then((data) => {
         // Add the date property for local state update
-        const chargeWithDate = { ...newCharge, date: new Date(chargeDate) };
+        const chargeWithDate = { ...newCharge, date: convertedDate };
         // Add the new charge to the state
         setCharges((prevCharges) => [...prevCharges, chargeWithDate]);
+        // Set the disposable income
+        setDisposableIncome(data.disposable_income);
         // Reset form fields
         setMerchantName("");
         setAmount("");
@@ -116,9 +122,9 @@ const Home = ({ userData }) => {
         </ul>
         <h2>Disposable Income</h2>
         <ul>
-          {financialPosition?.map((position, index) => (
+          {disposableIncome?.map((payPeriod, index) => (
             <li key={index}>
-              {`You have $${position.disposableIncome} in ${position.description}`}
+              {`You have $${payPeriod.disposableIncome} in ${payPeriod.description}`}
             </li>
           ))}
         </ul>
