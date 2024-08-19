@@ -35,6 +35,7 @@ const writeData = (data) => {
 };
 
 const frequencyConversionMap = {
+  // ONE_TIME: "One-Time",
   SEMI_MONTHLY: "Semi-Monthly",
   BIWEEKLY: "Bi-Weekly",
   WEEKLY: "Weekly",
@@ -46,7 +47,7 @@ const frequencyConversionMap = {
 
 // NOTE: Only to be used for response data from Plaid API
 const formatRecurringResponseData = (data) => {
-  let recurring_charges = [];
+  let charges = [];
 
   // recurring credits
   for (let i = 0; i < data.inflow_streams.length; i++) {
@@ -57,7 +58,7 @@ const formatRecurringResponseData = (data) => {
       itemName = data.inflow_streams[i].description;
     }
 
-    recurring_charges.push({
+    charges.push({
       merchant_name: itemName,
       amount: Math.abs(data.inflow_streams[i].last_amount.amount).toFixed(2),
       frequency: frequencyConversionMap[data.inflow_streams[i].frequency],
@@ -79,7 +80,7 @@ const formatRecurringResponseData = (data) => {
       itemName = data.outflow_streams[i].description;
     }
 
-    recurring_charges.push({
+    charges.push({
       merchant_name: itemName,
       amount: Math.abs(data.outflow_streams[i].last_amount.amount).toFixed(2),
       frequency: frequencyConversionMap[data.outflow_streams[i].frequency],
@@ -92,7 +93,7 @@ const formatRecurringResponseData = (data) => {
     });
   }
 
-  return recurring_charges;
+  return charges;
 };
 
 const getNextRecurringDate = (lastDate, frequency) => {
@@ -133,9 +134,9 @@ const getNextRecurringDate = (lastDate, frequency) => {
   }`;
 };
 
-const calculateDisposableIncome = (recurringCharges) => {
+const calculateDisposableIncome = (charges) => {
 
-  recurringCharges.sort((a, b) => new Date (a.charge_date) - new Date(b.charge_date));
+  charges.sort((a, b) => new Date (a.charge_date) - new Date(b.charge_date));
 
   let disposableIncomeInfo = [];
 
@@ -143,9 +144,10 @@ const calculateDisposableIncome = (recurringCharges) => {
   let payDayAmount = 0.0;
   let description = "";
   let totalDebits = 0.0;
+  let chargesInPeriod = []
 
-  for (let i = 0; i < recurringCharges.length; i++) {
-    let chargeItem = recurringCharges[i];
+  for (let i = 0; i < charges.length; i++) {
+    let chargeItem = charges[i];
 
     if (chargeItem.type === "credit") {
       if (payDay !== null && payDay !== chargeItem.charge_date) {
@@ -161,12 +163,14 @@ const calculateDisposableIncome = (recurringCharges) => {
           payDayAmount: payDayAmount,
           totalDebits: parseFloat(totalDebits.toFixed(2)),
           disposableIncome: parseFloat((payDayAmount - totalDebits).toFixed(2)),
+          chargesInPeriod: chargesInPeriod
         });
 
         // Reset values for next disposable income period
         description = "";
         totalDebits = 0.0;
         payDay = null;
+        chargesInPeriod = []
       } 
       else if (payDay == chargeItem.charge_date) {
         // console.log(chargeItem)
@@ -181,17 +185,32 @@ const calculateDisposableIncome = (recurringCharges) => {
       } to `;
     } else if (chargeItem.type === "debit" && payDay !== null) {
       totalDebits += parseFloat(chargeItem.amount);
+      chargesInPeriod.push(chargeItem);
     }
   }
 
   return disposableIncomeInfo;
 };
 
-const getChargesToRender = (recurringCharges) => {
+const getChargesToRender = (charges) => {
   let chargesToRender = [];
 
-  for (let i = 0; i < recurringCharges.length; i++) {
-    let charge = recurringCharges[i];
+  for (let i = 0; i < charges.length; i++) {
+
+    let charge = charges[i];
+
+    // Handle one-time charges
+    if (charge.frequency == "One-Time") {
+      chargesToRender.push({
+        merchant_name: charge.merchant_name,
+        amount: charge.amount,
+        frequency: charge.frequency,
+        charge_date: charge.last_charge_date,
+        type: charge.type
+      });
+      continue;
+    }
+
     let lastChargeDate = new Date(charge.last_charge_date);
 
     if (isNaN(lastChargeDate)) {
@@ -246,7 +265,7 @@ app.get("/users/:id", (req, res) => {
   const data = readData();
   const userIndex = data.findIndex((u) => u.id === parseInt(req.params.id));
   if (userIndex !== -1) {
-    data[userIndex].charges_to_render = getChargesToRender(data[userIndex].recurring_charges);
+    data[userIndex].charges_to_render = getChargesToRender(data[userIndex].charges);
     data[userIndex].disposable_income = calculateDisposableIncome(data[userIndex].charges_to_render);
     writeData(data);
     res.json(data[userIndex]);
@@ -286,7 +305,7 @@ app.post("/users", (req, res) => {
   const newUser = {
     id: data.length > 0 ? data[data.length - 1].id + 1 : 1,
     ...req.body,
-    recurring_charges: [],
+    charges: [],
     charges_to_render: [],
   };
   data.push(newUser);
@@ -307,8 +326,8 @@ app.put("/users/:id", (req, res) => {
   }
 });
 
-// Add a new recurring charge to a user's recurring_charges array
-app.post("/users/:id/recurring_charges", (req, res) => {
+// Add a new recurring charge to a user's charges array
+app.post("/users/:id/charges", (req, res) => {
   const userId = parseInt(req.params.id);
   const newCharge = req.body;
 
@@ -333,9 +352,9 @@ app.post("/users/:id/recurring_charges", (req, res) => {
     return res.status(404).send("User not found");
   }
 
-  data[userIndex].recurring_charges.push(newCharge);
+  data[userIndex].charges.push(newCharge);
   data[userIndex].charges_to_render = getChargesToRender(
-    data[userIndex].recurring_charges
+    data[userIndex].charges
   );
   data[userIndex].disposable_income = calculateDisposableIncome(data[userIndex].charges_to_render)
 
