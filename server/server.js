@@ -136,7 +136,19 @@ const getNextRecurringDate = (lastDate, frequency) => {
 
 const calculateDisposableIncome = (charges) => {
 
-  charges.sort((a, b) => new Date (a.charge_date) - new Date(b.charge_date));
+  // Sort by date first, then by frequency to ensure credits come before debits
+  charges.sort((a, b) => {
+    let dateComparison = new Date(a.charge_date) - new Date(b.charge_date);
+    if (dateComparison !== 0) return dateComparison;
+
+    // If dates are the same, sort by type (credit before debit)
+    if (a.type === "credit" && b.type === "debit") return -1;
+    if (a.type === "debit" && b.type === "credit") return 1;
+
+    return 0;
+  });
+
+  console.log(charges)
 
   let disposableIncomeInfo = [];
 
@@ -173,7 +185,6 @@ const calculateDisposableIncome = (charges) => {
         chargesInPeriod = []
       } 
       else if (payDay == chargeItem.charge_date) {
-        // console.log(chargeItem)
         chargeItem.amount = parseFloat(chargeItem.amount) + payDayAmount
       }
 
