@@ -337,7 +337,7 @@ app.put("/users/:id", (req, res) => {
   }
 });
 
-// Add a new recurring charge to a user's charges array
+// Add a new charge to a user's charges array
 app.post("/users/:id/charges", (req, res) => {
   const userId = parseInt(req.params.id);
   const newCharge = req.body;

@@ -56,7 +56,7 @@ const Home = ({ userData }) => {
     convertedDate.setDate(convertedDate.getDate() + 1)
   
     // Send the POST request
-    fetch(`http://localhost:3000/users/${userData.id}/recurring_charges`, {
+    fetch(`http://localhost:3000/users/${userData.id}/charges`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -137,7 +137,8 @@ const Home = ({ userData }) => {
                 self.findIndex(
                   (t) =>
                     t.merchant_name === charge.merchant_name &&
-                    t.amount === charge.amount
+                    t.amount === charge.amount &&
+                    t.frequency !== "One-Time"
                 )
             )
             .map((charge, index) => (
